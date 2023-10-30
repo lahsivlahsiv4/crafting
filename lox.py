@@ -1,6 +1,10 @@
 from sys import argv
+from typing import Union
 
+import token
 import scanner as scan
+import parser
+import ast_printer
 
 had_error : bool = False
 
@@ -8,6 +12,13 @@ def run(source : str) -> None:
     scanner = scan.Scanner(source)
     tokens = scanner.scan_tokens()
 
+    _parser = parser.Parser(tokens)
+    expression = _parser.parse()
+
+    if had_error:
+        return
+    else:
+        print(ast_printer.AstPrinter().print_ast(expression))
     for token in tokens:
         print(token)
 
@@ -39,8 +50,15 @@ def run_prompt() -> None:
         run(line)
         had_error = False
 
-def error(line : int, message : str) -> None:
-    report(line, "", message)
+def error(line : Union[int, token.Token], message : str) -> None:
+    if type(line) == int:
+        report(line, "", message)
+    else:
+        _token = line
+        if (_token.token_type == token.TokenType.EOF):
+            report(_token.line, " at end", message)
+        else:
+            report(_token.line, f" at '{_token.lexeme}'", message)
 
 def report(line : int, where : str, message : str) -> None:
     global had_error
