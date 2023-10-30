@@ -1,12 +1,14 @@
-from sys import argv
 from typing import Union
 
-import token
+import Token
 import scanner as scan
 import parser
 import ast_printer
+import interpreter
 
 had_error : bool = False
+had_runtime_error : bool = False
+interprter = interpreter.Interpreter() # The typo is intentional
 
 def run(source : str) -> None:
     scanner = scan.Scanner(source)
@@ -18,9 +20,10 @@ def run(source : str) -> None:
     if had_error:
         return
     else:
-        print(ast_printer.AstPrinter().print_ast(expression))
-    for token in tokens:
-        print(token)
+        #print(ast_printer.AstPrinter().print_ast(expression))
+        interprter.interpret(expression)
+    # for token in tokens:
+    #     print(token)
 
 def run_file(path : str) -> None:
     global had_error 
@@ -36,6 +39,8 @@ def run_file(path : str) -> None:
 
     if had_error:
         exit(65)
+    if had_runtime_error:
+        exit(70)
 
 def run_prompt() -> None:
     global had_error 
@@ -50,27 +55,23 @@ def run_prompt() -> None:
         run(line)
         had_error = False
 
-def error(line : Union[int, token.Token], message : str) -> None:
+def error(line : Union[int, Token.Token], message : str) -> None:
     if type(line) == int:
         report(line, "", message)
     else:
         _token = line
-        if (_token.token_type == token.TokenType.EOF):
+        if (_token.token_type == Token.TokenType.EOF):
             report(_token.line, " at end", message)
         else:
             report(_token.line, f" at '{_token.lexeme}'", message)
+
+def runtime_error(e : interpreter.RuntimeError):
+    global had_runtime_error
+    print(f"{str(e)}\n[line{e.token.line}]")
+    had_runtime_error = True
 
 def report(line : int, where : str, message : str) -> None:
     global had_error
     print(f"[line {line}] Error{where}: {message}")
 
     had_error = True
-
-if __name__ == "__main__":
-    if len(argv) > 2:
-        print("Usage: python lox.py [script]")
-        exit(64)
-    elif len(argv) == 2:
-        run_file(argv[1])
-    else:
-        run_prompt()

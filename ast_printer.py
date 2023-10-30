@@ -1,5 +1,5 @@
 import expr
-import token
+import Token
 
 class AstPrinter(expr.ExprVisitor):
     def print_ast(self, expression : expr.Expr):
@@ -27,10 +27,10 @@ class AstPrinter(expr.ExprVisitor):
 if __name__ == "__main__":
     expression = expr.Binary(
         expr.Unary(
-            token.Token(token.TokenType.MINUS, "-", None, 1),
+            Token.Token(Token.TokenType.MINUS, "-", None, 1),
             expr.Literal(123)
         ),
-        token.Token(token.TokenType.STAR, "*", None, 1),
+        Token.Token(Token.TokenType.STAR, "*", None, 1),
         expr.Grouping(
             expr.Literal(45.67)
         )

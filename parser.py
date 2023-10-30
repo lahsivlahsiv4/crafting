@@ -1,6 +1,6 @@
 from typing import List
 
-import token
+import Token
 import expr
 import lox
 
@@ -8,10 +8,10 @@ class ParseError(Exception):
     pass
 
 class Parser:
-    tokens : List[token.Token]
+    tokens : List[Token.Token]
     current : int
 
-    def __init__(self, tokens : List[token.Token]):
+    def __init__(self, tokens : List[Token.Token]):
         self.tokens = tokens
         self.current = 0
     
@@ -27,7 +27,7 @@ class Parser:
     def equality(self) -> expr.Expr:
         expression = self.comparison()
 
-        while self.match(token.TokenType.BANG_EQUAL, token.TokenType.EQUAL_EQUAL):
+        while self.match(Token.TokenType.BANG_EQUAL, Token.TokenType.EQUAL_EQUAL):
             operator = self.previous()
             right = self.comparison()
             expression = expr.Binary(expression, operator, right)
@@ -42,31 +42,31 @@ class Parser:
         else:
             return False
         
-    def check(self, _type : token.TokenType) -> True:
+    def check(self, _type : Token.TokenType) -> True:
         if self.is_at_end():
             return False
         return self.peek().token_type == _type
     
-    def advance(self) -> token.Token:
+    def advance(self) -> Token.Token:
         if not self.is_at_end():
             self.current += 1
         return self.previous()
     
     def is_at_end(self) -> bool:
-        return self.peek().token_type == token.TokenType.EOF
+        return self.peek().token_type == Token.TokenType.EOF
     
-    def peek(self) -> token.Token:
+    def peek(self) -> Token.Token:
         return self.tokens[self.current]
 
-    def previous(self) -> token.Token:
+    def previous(self) -> Token.Token:
         return self.tokens[self.current - 1]
     
     def comparison(self) -> expr.Expr:
         expression = self.addition()
-        while self.match(token.TokenType.GREATER, 
-                         token.TokenType.GREATER_EQUAL,
-                         token.TokenType.LESS,
-                         token.TokenType.LESS_EQUAL):
+        while self.match(Token.TokenType.GREATER, 
+                         Token.TokenType.GREATER_EQUAL,
+                         Token.TokenType.LESS,
+                         Token.TokenType.LESS_EQUAL):
             operator = self.previous()
             right = self.addition()
             expression = expr.Binary(expression, operator, right)
@@ -76,7 +76,7 @@ class Parser:
     
     def addition(self) -> expr.Expr:
         expression = self.multiplication()
-        while self.match(token.TokenType.MINUS, token.TokenType.PLUS):
+        while self.match(Token.TokenType.MINUS, Token.TokenType.PLUS):
             operator = self.previous()
             right = self.multiplication()
             expression = expr.Binary(expression, operator, right)
@@ -85,7 +85,7 @@ class Parser:
     
     def multiplication(self) -> expr.Expr:
         expression = self.unary()
-        while self.match(token.TokenType.SLASH, token.TokenType.STAR):
+        while self.match(Token.TokenType.SLASH, Token.TokenType.STAR):
             operator = self.previous()
             right = self.unary()
             expression = expr.Binary(expression, operator, right)
@@ -93,7 +93,7 @@ class Parser:
         return expression
     
     def unary(self) -> expr.Expr:
-        if self.match(token.TokenType.BANG, token.TokenType.MINUS):
+        if self.match(Token.TokenType.BANG, Token.TokenType.MINUS):
             operator = self.previous()
             right = self.unary()
             return expr.Unary(operator, right)
@@ -101,30 +101,30 @@ class Parser:
             return self.primary()
     
     def primary(self) -> expr.Expr:
-        if self.match(token.TokenType.FALSE):
+        if self.match(Token.TokenType.FALSE):
             return expr.Literal(False)
-        if self.match(token.TokenType.TRUE):
+        if self.match(Token.TokenType.TRUE):
             return expr.Literal(True)
-        if self.match(token.TokenType.NIL):
+        if self.match(Token.TokenType.NIL):
             return expr.Literal(None)
         
-        if self.match(token.TokenType.NUMBER, token.TokenType.STRING):
+        if self.match(Token.TokenType.NUMBER, Token.TokenType.STRING):
             return expr.Literal(self.previous().literal)
         
-        if self.match(token.TokenType.LEFT_PAREN):
+        if self.match(Token.TokenType.LEFT_PAREN):
             expression = self.expression()
-            self.consume(token.TokenType.RIGHT_PAREN, "Expect ')' after expression.")
+            self.consume(Token.TokenType.RIGHT_PAREN, "Expect ')' after expression.")
             return expr.Grouping(expression)
         
         raise self.error(self.peek(), "Expect expression.")
         
-    def consume(self, _type : token.TokenType, message : str) -> token.Token:
+    def consume(self, _type : Token.TokenType, message : str) -> Token.Token:
         if self.check(_type):
             return self.advance()
         else:
             raise self.error(self.peek(), message)
 
-    def error(self, _token : token.Token, message : str) -> ParseError:
+    def error(self, _token : Token.Token, message : str) -> ParseError:
         lox.error(_token, message)
         return ParseError()
     
@@ -132,18 +132,18 @@ class Parser:
         self.advance()
 
         while not self.is_at_end():
-            if self.previous().token_type == token.TokenType.SEMICOLON:
+            if self.previous().token_type == Token.TokenType.SEMICOLON:
                 return
             
             if self.peek().token_type in (
-                token.TokenType.CLASS,
-                token.TokenType.FUN,
-                token.TokenType.VAR,
-                token.TokenType.FOR,
-                token.TokenType.IF,
-                token.TokenType.WHILE,
-                token.TokenType.PRINT,
-                token.TokenType.RETURN
+                Token.TokenType.CLASS,
+                Token.TokenType.FUN,
+                Token.TokenType.VAR,
+                Token.TokenType.FOR,
+                Token.TokenType.IF,
+                Token.TokenType.WHILE,
+                Token.TokenType.PRINT,
+                Token.TokenType.RETURN
             ):
                 return
             
