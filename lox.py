@@ -15,13 +15,13 @@ def run(source : str) -> None:
     tokens = scanner.scan_tokens()
 
     _parser = parser.Parser(tokens)
-    expression = _parser.parse()
+    statements = _parser.parse()
 
     if had_error:
         return
     else:
         #print(ast_printer.AstPrinter().print_ast(expression))
-        interprter.interpret(expression)
+        interprter.interpret(statements)
     # for token in tokens:
     #     print(token)
 

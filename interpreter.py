@@ -1,23 +1,70 @@
+from typing import List
+
 import expr
 import Token
 import lox
+import stmt
+import environment
 
 class RuntimeError(Exception):
     def __init__(self, token, message):
         super().__init__(message)
         self.token = token
 
-class Interpreter(expr.ExprVisitor):
+class Interpreter(expr.ExprVisitor, stmt.StmtVisitor):
+    env : environment.Environment
+
+    def __init__(self):
+        self.env = environment.Environment()
+
+    def visit_block_stmt(self, statement : stmt.Block):
+        self.execute_block(statement.statements, environment.Environment(self.env))
+
+    def execute_block(self, statements : List[stmt.Stmt], env : environment.Environment):
+        previous = self.env
+
+        try:
+            self.env = env
+
+            for statement in statements:
+                self.execute(statement)
+        finally:
+            self.env = previous
+
+    def visit_expression_stmt(self, stmt):
+        self.evaluate(stmt.expression)
+
+    def visit_print_stmt(self, stmt):
+        value = self.evaluate(stmt.expression)
+        print(self.stringify(value))
+    
+    def visit_var_stmt(self, stmt):
+        value = None
+
+        if stmt.initializer != None:
+            value = self.evaluate(stmt.initializer)
+
+            self.env.define(stmt.name.lexeme, value)
+    
+    def visit_assign_expr(self, expr):
+        value = self.evaluate(expr.value)
+
+        self.env.assign(expr.name, value)
+        return value
+
     def evaluate(self, expression : expr.Expr):
         return expression.accept(self)
     
-    def interpret(self, expression : expr.Expr):
+    def interpret(self, statements : List[stmt.Stmt]):
         try:
-            value = self.evaluate(expression)
-            print(value)
+            for statement in statements:
+                self.execute(statement)
         except RuntimeError as e:
             lox.runtime_error(e)
     
+    def execute(self, statement : stmt.Stmt):
+        statement.accept(self)
+
     def stringify(self, obj) -> str:
         return "nil" if obj == None else str(obj)
     
@@ -88,6 +135,9 @@ class Interpreter(expr.ExprVisitor):
             return not self.is_truthy(right)
         
         raise Exception("Unreachable")
+
+    def visit_variable_expr(self, expr):
+        return self.env.get(expr.name)
 
     def is_truthy(self, obj) -> bool:
         return obj != None and obj != False

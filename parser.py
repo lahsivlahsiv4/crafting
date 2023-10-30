@@ -3,6 +3,7 @@ from typing import List
 import Token
 import expr
 import lox
+import stmt
 
 class ParseError(Exception):
     pass
@@ -16,13 +17,79 @@ class Parser:
         self.current = 0
     
     def parse(self):
+        statements = []
+        while not self.is_at_end():
+            statements.append(self.declaration())
+        
+        return statements
+
+    def declaration(self) -> stmt.Stmt:
         try:
-            return self.expression()
+            if self.match(Token.TokenType.VAR):
+                return self.var_declaration()
+            else:
+                return self.statement()
         except ParseError:
+            self.synchronize()
             return None
+        
+    def var_declaration(self) -> stmt.Stmt:
+        name = self.consume(Token.TokenType.IDENTIFIER, "Expect variable name.")
+        
+        initializer = None
+        if self.match(Token.TokenType.EQUAL):
+            initializer = self.expression()
+        
+        self.consume(Token.TokenType.SEMICOLON, "Expect ';' after variable declaration.")
+        return stmt.Var(name, initializer)
     
+    def statement(self) -> stmt.Stmt:
+        if self.match(Token.TokenType.PRINT):
+            return self.print_statement()
+        
+        if self.match(Token.TokenType.LEFT_BRACE):
+            return stmt.Block(self.block())
+
+        return self.expression_statement()
+
+    def block(self) -> List[stmt.Stmt]:
+        statements = []
+
+        while not self.check(Token.TokenType.RIGHT_BRACE) and not self.is_at_end():
+            statements.append(self.declaration())
+        
+        self.consume(Token.TokenType.RIGHT_BRACE, "Expect '}' after block.")
+
+        return statements
+
+    def print_statement(self) -> stmt.Stmt:
+        value = self.expression()
+        self.consume(Token.TokenType.SEMICOLON, "Expect ';' after value.")
+        return stmt.Print(value)
+    
+    def expression_statement(self) -> stmt.Stmt:
+        expr = self.expression()
+        self.consume(Token.TokenType.SEMICOLON, "Expect ';' after expression.")
+        return stmt.Expression(expr)
+    
+    def assignment(self) -> expr.Expr:
+        expression = self.equality()
+
+        if self.match(Token.TokenType.EQUAL):
+            equals = self.previous()
+            value  = self.assignment()
+
+            if type(expression) == expr.Variable:
+                name = expression.name
+                return expr.Assign(name, value)
+            else:
+                self.error(equals, "Invalid assignment target")
+        
+        return expression
+
+
     def expression(self) -> expr.Expr:
-        return self.equality()
+        return self.assignment()
     
     def equality(self) -> expr.Expr:
         expression = self.comparison()
@@ -110,6 +177,9 @@ class Parser:
         
         if self.match(Token.TokenType.NUMBER, Token.TokenType.STRING):
             return expr.Literal(self.previous().literal)
+        
+        if (self.match(Token.TokenType.IDENTIFIER)):
+            return expr.Variable(self.previous())
         
         if self.match(Token.TokenType.LEFT_PAREN):
             expression = self.expression()

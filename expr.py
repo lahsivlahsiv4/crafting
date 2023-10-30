@@ -3,6 +3,8 @@
 from Token import Token
 
 class ExprVisitor:
+    def visit_assign_expr(self, expr):
+        raise NotImplementedError()
     def visit_binary_expr(self, expr):
         raise NotImplementedError()
     def visit_grouping_expr(self, expr):
@@ -11,11 +13,25 @@ class ExprVisitor:
         raise NotImplementedError()
     def visit_unary_expr(self, expr):
         raise NotImplementedError()
+    def visit_variable_expr(self, expr):
+        raise NotImplementedError()
 
 
 class Expr:
     def accept(self, visitor : ExprVisitor):
         raise NotImplementedError()
+
+class Assign(Expr):
+    name : Token
+    value : Expr
+
+    def __init__(self, name : Token, value : Expr):
+        self.name = name
+        self.value = value
+
+    def accept(self, visitor : ExprVisitor):
+        return visitor.visit_assign_expr(self)
+
 
 class Binary(Expr):
     left : Expr
@@ -61,5 +77,15 @@ class Unary(Expr):
 
     def accept(self, visitor : ExprVisitor):
         return visitor.visit_unary_expr(self)
+
+
+class Variable(Expr):
+    name : Token
+
+    def __init__(self, name : Token):
+        self.name = name
+
+    def accept(self, visitor : ExprVisitor):
+        return visitor.visit_variable_expr(self)
 
 
