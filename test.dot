@@ -1,0 +1,19 @@
+digraph astgraph {
+  node [shape=circle, fontsize=12, fontname="Courier", height=.1];
+  ranksep=.3;
+  edge [arrowsize=.5]
+
+  node1 [label="Program"]
+  node2 [label="Block Stmt "]
+  node3 [label="Var Stmt (Assign)y"]
+  node4 [label="Literal 100.0"]
+  node3 -> node4
+  node5 [label="Print Stmt "]
+  node6 [label="group"]
+  node7 [label="Expr Var y"]
+  node6 -> node7
+  node5 -> node6
+  node2 -> node3
+  node2 -> node5
+  node1 -> node2
+}
