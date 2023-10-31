@@ -10,15 +10,6 @@ had_error : bool = False
 had_runtime_error : bool = False
 interprter = interpreter.Interpreter() # The typo is intentional
 
-
-def vishal_ast(source : str):
-    scanner = scan.Scanner(source)
-    tokens = scanner.scan_tokens()
-
-    _parser = parser.Parser(tokens)
-    statements = _parser.parse()
-    return statements
-
 def run(source : str) -> None:
     scanner = scan.Scanner(source)
     tokens = scanner.scan_tokens()

@@ -11,6 +11,8 @@ class ExprVisitor:
         raise NotImplementedError()
     def visit_literal_expr(self, expr):
         raise NotImplementedError()
+    def visit_logical_expr(self, expr):
+        raise NotImplementedError()
     def visit_unary_expr(self, expr):
         raise NotImplementedError()
     def visit_variable_expr(self, expr):
@@ -65,6 +67,20 @@ class Literal(Expr):
 
     def accept(self, visitor : ExprVisitor):
         return visitor.visit_literal_expr(self)
+
+
+class Logical(Expr):
+    left : Expr
+    operator : Token
+    right : Expr
+
+    def __init__(self, left : Expr, operator : Token, right : Expr):
+        self.left = left
+        self.operator = operator
+        self.right = right
+
+    def accept(self, visitor : ExprVisitor):
+        return visitor.visit_logical_expr(self)
 
 
 class Unary(Expr):
