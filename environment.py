@@ -38,3 +38,17 @@ class Environment:
             name,
             f"Undefined variable '{name.lexeme}'."
         )
+    
+    def get_at(self, distance : int, name : str):
+        return self.ancestor(distance).values.get(name)
+    
+    def assign_at(self, distance : int, name : Token.Token, value : Any):
+        self.ancestor(distance).values[name.lexeme] = value
+    
+    def ancestor(self, distance : int):
+        environment = self
+
+        for _ in range(distance):
+            environment = environment.enclosing
+        
+        return environment

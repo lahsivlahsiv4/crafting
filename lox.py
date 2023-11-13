@@ -5,6 +5,7 @@ import scanner as scan
 import parser
 import ast_printer
 import interpreter
+import Resolver
 
 had_error : bool = False
 had_runtime_error : bool = False
@@ -19,9 +20,15 @@ def run(source : str) -> None:
 
     if had_error:
         return
-    else:
-        #print(ast_printer.AstPrinter().print_ast(expression))
-        interprter.interpret(statements)
+
+    resolver = Resolver.Resolver(interprter)
+    resolver.resolve(statements)
+
+    if had_error:
+        return
+
+    #print(ast_printer.AstPrinter().print_ast(expression))
+    interprter.interpret(statements)
     # for token in tokens:
     #     print(token)
 

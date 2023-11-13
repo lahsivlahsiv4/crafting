@@ -1,9 +1,15 @@
 from typing import List, Any
+from enum import Enum, auto
 
 import LoxCallable
 import stmt
 import environment
 import interpreter as Interpreter
+
+
+class FunctionType(Enum):
+    NONE     = auto()
+    FUNCTION = auto()
 
 class LoxFunction(LoxCallable.LoxCallable):
     declaration : stmt.Function

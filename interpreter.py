@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 from time import time
 
 import expr
@@ -20,10 +20,12 @@ class Return(Exception):
 class Interpreter(expr.ExprVisitor, stmt.StmtVisitor):
     _globals : environment.Environment
     env : environment.Environment
+    _locals : Dict[expr.Expr, int] 
 
     def __init__(self):
         self.env = environment.Environment()
         self._globals = self.env
+        self._locals = {}
 
         clock = LoxCallable.LoxCallable()
 
@@ -32,6 +34,9 @@ class Interpreter(expr.ExprVisitor, stmt.StmtVisitor):
         clock.__str__ = lambda self: "<native fn>"
 
         self._globals.define("clock", clock)
+    
+    def resolve(self, expr, depth):
+        self._locals[expr] = depth
 
     def visit_block_stmt(self, statement : stmt.Block):
         self.execute_block(statement.statements, environment.Environment(self.env))
@@ -87,7 +92,13 @@ class Interpreter(expr.ExprVisitor, stmt.StmtVisitor):
     def visit_assign_expr(self, expr):
         value = self.evaluate(expr.value)
 
-        self.env.assign(expr.name, value)
+        distance = self._locals[expr] if expr in self._locals else None
+
+        if distance != None:
+            self.env.assign_at(distance, expr.name, value)
+        else:
+            self._globals.assign(expr.name, value)
+
         return value
 
     def evaluate(self, expression : expr.Expr):
@@ -204,7 +215,15 @@ class Interpreter(expr.ExprVisitor, stmt.StmtVisitor):
         raise Exception("Unreachable")
 
     def visit_variable_expr(self, expr):
-        return self.env.get(expr.name)
+        return self.look_up_variable(expr.name, expr)
+    
+    def look_up_variable(self, name : Token.Token, expr):
+        distance = self._locals.get(expr, None)
+        if distance != None:
+            return self.env.get_at(distance, name.lexeme)
+        else:
+            return self._globals.get(name)
+
 
     def is_truthy(self, obj) -> bool:
         return obj != None and obj != False
