@@ -1,21 +1,37 @@
 from typing import List
+from time import time
 
 import expr
 import Token
 import lox
 import stmt
 import environment
-
+import LoxCallable
+import LoxFunction
 class RuntimeError(Exception):
     def __init__(self, token, message):
         super().__init__(message)
         self.token = token
 
+class Return(Exception):
+    def __init__(self, value):
+        self.value = value
+
 class Interpreter(expr.ExprVisitor, stmt.StmtVisitor):
+    _globals : environment.Environment
     env : environment.Environment
 
     def __init__(self):
         self.env = environment.Environment()
+        self._globals = self.env
+
+        clock = LoxCallable.LoxCallable()
+
+        clock.call = lambda self, interpreter, args: time()
+        clock.arity = lambda self: 0
+        clock.__str__ = lambda self: "<native fn>"
+
+        self._globals.define("clock", clock)
 
     def visit_block_stmt(self, statement : stmt.Block):
         self.execute_block(statement.statements, environment.Environment(self.env))
@@ -140,6 +156,35 @@ class Interpreter(expr.ExprVisitor, stmt.StmtVisitor):
 
         if _type == Token.TokenType.EQUAL_EQUAL:
             return self.is_equal(left, right)
+    
+    def visit_function_stmt(self, stmt):
+        function = LoxFunction.LoxFunction(stmt, self.env)
+        self.env.define(stmt.name.lexeme, function)
+    
+    def visit_return_stmt(self, stmt):
+        value = None
+
+        if stmt.value != None:
+            value = self.evaluate(stmt.value)
+        
+        raise Return(value)
+    
+    def visit_call_expr(self, expr):
+        callee = self.evaluate(expr.callee)
+
+        arguments = []
+        for argument in expr.arguments:
+            arguments.append(self.evaluate(argument))
+
+        if not isinstance(callee, LoxCallable.LoxCallable):
+            raise RuntimeError(expr.paren, "Can only call functions and classes.")
+        
+        function : LoxCallable.LoxCallable = callee
+
+        if len(arguments) != function.arity():
+            raise RuntimeError(expr.paren, f"Expected {function.arity()} arguments but got {len(arguments)}.")
+
+        return function.call(self, arguments)
 
     def visit_grouping_expr(self, expr : expr.Grouping):
         return self.evaluate(expr.expression)

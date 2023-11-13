@@ -9,7 +9,11 @@ class StmtVisitor:
         raise NotImplementedError()
     def visit_expression_stmt(self, stmt):
         raise NotImplementedError()
+    def visit_function_stmt(self, stmt):
+        raise NotImplementedError()
     def visit_if_stmt(self, stmt):
+        raise NotImplementedError()
+    def visit_return_stmt(self, stmt):
         raise NotImplementedError()
     def visit_print_stmt(self, stmt):
         raise NotImplementedError()
@@ -43,6 +47,20 @@ class Expression(Stmt):
         return visitor.visit_expression_stmt(self)
 
 
+class Function(Stmt):
+    name : Token
+    params : List[Token]
+    body : List[Stmt]
+
+    def __init__(self, name : Token, params : List[Token], body : List[Stmt]):
+        self.name = name
+        self.params = params
+        self.body = body
+
+    def accept(self, visitor : StmtVisitor):
+        return visitor.visit_function_stmt(self)
+
+
 class If(Stmt):
     condition : Expr
     then_branch : Stmt
@@ -55,6 +73,18 @@ class If(Stmt):
 
     def accept(self, visitor : StmtVisitor):
         return visitor.visit_if_stmt(self)
+
+
+class Return(Stmt):
+    keyword : Token
+    value : Expr
+
+    def __init__(self, keyword : Token, value : Expr):
+        self.keyword = keyword
+        self.value = value
+
+    def accept(self, visitor : StmtVisitor):
+        return visitor.visit_return_stmt(self)
 
 
 class Print(Stmt):
