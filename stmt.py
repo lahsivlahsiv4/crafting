@@ -7,6 +7,8 @@ from typing import List
 class StmtVisitor:
     def visit_block_stmt(self, stmt):
         raise NotImplementedError()
+    def visit_class_stmt(self, stmt):
+        raise NotImplementedError()
     def visit_expression_stmt(self, stmt):
         raise NotImplementedError()
     def visit_function_stmt(self, stmt):
@@ -59,6 +61,18 @@ class Function(Stmt):
 
     def accept(self, visitor : StmtVisitor):
         return visitor.visit_function_stmt(self)
+
+
+class Class(Stmt):
+    name : Token
+    methods : List[Function]
+
+    def __init__(self, name : Token, methods : List[Function]):
+        self.name = name
+        self.methods = methods
+
+    def accept(self, visitor : StmtVisitor):
+        return visitor.visit_class_stmt(self)
 
 
 class If(Stmt):

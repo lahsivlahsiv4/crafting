@@ -1,0 +1,771 @@
+Mynotee:
+Chapter 4 scanner
+
+
+Chapter 7
+The traditonal place to synchronize is between statments. We synchronize on catching ParseError.
+My thingy on parsing:
+ Looking at the grammar:
+   equality, comparison, term, factor ==> BinaryExpr
+   unary => UnaryExpr
+   primary => LiteralExpr
+   ('expression') => GroupExpr
+
+
+Chapter 8 Statments:
+assignment is an expression not statement. print (a=2); is fine.
+It has lowest precedence.
+
+Scopes and envs are close cousins. As our interpreter works its way through the code, syntex tree nodes
+that affect scope will change the env.
+
+Lox's scope is controlled by curly-braces. we call it block-scope.
+Beginning os block introduces new local scope, and that scope ends when execution
+passes the closing }. Any variables  declared inside the block disappear.
+
+We define fresh env for each "block", containing only the variables defined in that scopoe.
+When we exit the block, we discard the env and restore the previous one.
+
+Separating statments and expr classes allow us not to make dumb mistakes like passing a statment to a function.
+There is no place in the grammar where both expr and statement is allowed.
+
+In interpreter, remember visit methods return nothing for statments but values for expression.
+
+A new variable is always declared in the current environment but variable look-up and assignment
+work with existing variables and need to walk up the chain to find them.
+
+For global vars, we will allow redefinition of variable:
+var x=10;
+var x=20;
+but not at global level.
+
+
+It is ok to refer to variable before we define it as it allows to use mutually recursive fns
+but not at global level.
+
+
+It is ok to refer to variable before we define it as it allows to use mutually recursive fns.
+for eg:
+fun fa() { fb(); }
+fun fb() { fa(); }
+
+But this "paradigm" will lead to runtime errors in scenarios like:
+print(a);
+var a=10;
+
+Lox is statically scoped but methods and fields on objects are dynamically scoped.
+For eg x.fn(), we do not know which fn on object x is called until code executes.
+We do not know what "x" points to before code execute.
+
+
+Chapter 9 ( programming constructs)
+
+ifStmt         → "if" "(" expression ")" statement
+                 ( "else" statement )? ;
+
+If stmt grammar is ambiguous.
+
+
+Function:
+
+It is the parentheses following an expression that indicate a function call.
+You can think of a call as sort of like a postfix operator that starts with (.
+
+This “operator” has higher precedence than any other operator, even the unary ones.
+So we slot it into the grammar by having the unary rule bubble up to a new call rule.
+
+
+unary          → ( "!" | "-" ) unary | call ;
+call           → primary ( "(" arguments? ")" )*
+
+(Vishal: looks like grammar can allow lots of "un-meaningful" syntax as well.
+All primary() will not make sense
+
+
+caller()();
+Above is 2 call expressions. "caller" can be anything (not just a name), that can be any expr that evaluates
+to a function.
+
+Design:
+We could have tried to interpret function in Ast Stmt.Function but we do not want runtime-phase of interpreter
+to bleed into front-end syntax classes. So we do not let Stmt.Function to implement it.
+Instead we wrap into new class LoxFunction.
+
+
+returnStmt     → "return" expression? ";" ;
+Every lox func must return something, even if it contains "no return". We use "nil" for this.
+That is why "call" implementation of LoxFunction returns "None" at the end.
+
+fun xy(a, b) {
+}
+
+xy becomes expr.Variable
+
+
+=================================================================================================================
+
+
+Resolver.py
+Environments are dynamic manipulation of static scopes.
+A block is not all actually at same scope.
+Static scope means, variable usage always resolves the same declaration which can be determined by looking at text
+Given that, why are we dynamically doing it everywhere. It is slow
+better solution is to resolve each variable use, once
+each environment corresponds to single lexical scope where variables are declared. If we could ensure variable lookup always
+ walk the same number of links in environment chain, that would ensure that it found the same variable in same scope every time.
+To resolve a variable we only need to calculate how many hops away the declared variable will be in environment chain.
+
+In Resolver
+Dict[str,bool]
+A variable declaration defn , adds the variable to innermost scope in resover.py
+It shadows any "outer" one and we know variable exists. We mark it "not ready yet" (false). This bool value indicates whether we have
+finished resolving the variable's initializer.We set the variable's value in scope map to be true to mark it as fully initialized
+and available for use.
+
+Variable and fn decl write to scope map. These maps are read when we resolve fun declarations.
+
+
+Resolver:
+Variable declaration and functon declaration write to scope maps.
+These maps are read when we we resolve the variable expressions
+
+
+Resolover needs to visit all nodes in syntax tree. Only few node are interesting:
+1) Block: introduces new scope
+2) fn decl: adds new scope and binds it params in the scope
+3) variable declaration: adds new vars in scope
+4) variable decl adds new var in scope .
+5) variable and assignment expressiosn need to have their vars resoloved
+
+The scope stack is only used for local block scopes. Variables declared at "top level"
+in global scope are tracked by the resolver because they are more dynamic in lox.
+When resolving a variable if we cannot find in stack of local scopes, we assume it must be global.
+
+Kinds of problems we address in resolver:
+
+Redeclaration
+var x = "abcd"
+var x = "efgh"
+
+We start at innermost scope and work outwards, looking in earh scope map for a matching name.
+If we find variable we resolve it ( passing in number of scopes) between current innermost scope and scope
+where variable was found.
+If variable was found in current scope, we pass 0.
+If variable was found in immediate enclosing scope, we pass 1.
+If we walk them all the scopes and never find the variable, we leave it unresolved and assume its global.
+
+
+
+def visit_function_stmt(self, stmt):
+    self.declare(stmt.name)
+    ....
+    ....
+
+   self.resolve(function.body)
+
+We resolve the fn body also when we hit fn decl AST node in semantic analysis unlike in interpreter.
+At runtime(i.e in interpreter) fn declaration does not do anything with fn body. The body does not get touched
+until later when fn is called. At 'static analysis' we immedidately traverse into the body.
+
+Function decl both
+    1) bind names and
+    2) introduce scope.
+
+    Name of fun is bound to scope where fun is declared. Whe we step into fun body, we bind params to inner fun scope.
+
+In resolver.py
+    def resolve_local(self, expr, name : Token.Token):
+        for i in range(len(self.scopes) - 1, -1, -1):
+            if name.lexeme in self.scopes[i]:
+                self.interpreter.resolve(expr, len(self.scopes) - 1 - i)
+                return
+
+In interpreter.py
+
+    _locals : Dict[expr.Expr, int]
+     self._locals = {}
+
+
+    def resolve(self, expr, depth):
+        self._locals[expr] = depth
+
+
+Interpreting resolved variables:
+Each time "resovlver" visits a variable, it tells the interpreter how many scopes are between current scope
+and the scope where variable is defined. At runtime, it coressponds exactly the number of envs between current one and enclosing one
+where interpreter can find variable's value.
+
+=================================================================================================================
+Chapter 13
+Like most dynamically typed languages, fIt’s not common to declare a class as a local variable, but Lox permits itields are not explicitly listed in the class declaration.
+Instances are loose bags of data and you can freely add fields to them as you see fit using normal imperative code
+
+A class can appear anywhere a named declaration is allowed, triggered by the leading class keyword
+It’s not common to declare a class as a local variable, but Lox permits it
+
+We already have class objects, and we already have function calls, so we’ll use call expressions on class objects to create new instances.
+When you “call” a class, it instantiates a new LoxInstance for the called class and returns it.
+
+Property Access:
+An expression followed by . and an identifier reads the property with that name from the object the expression evaluates to.
+That dot has the same precedence as the parentheses in a function call expression,
+so we slot it into the grammar by replacing the existing call rule with:
+
+call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
+After a primary expression, we allow a series of any mixture of parenthesized calls and dotted property accesses.
+“Property access” is a mouthful, so from here on out, we’ll call these “get expressions”.
+
+Set Expressions:
+Setters use the same syntax as getters, except they appear on the left side of an assignment.
+
+someObject.someProperty = value;
+In grammar land, we extend the rule for assignment to allow dotted identifiers on the left-hand side.
+
+assignment     → ( call "." )? IDENTIFIER "=" assignment
+               | logic_or ;
+Unlike getters, setters don’t chain.
+However, the reference to call allows any high-precedence expression before the last dot, including any number of getters:
+
+In reslover.py for set expr:
+
+
+   ###vishal
+   #Again, like Expr.Get, the property itself is dynamically evaluated, so there’s nothing to resolve there. All we need to do is recurse into the two subexpressions of Expr.Set, the object whose property is being set, and the value it’s being set to.
+    def visit_set_expr(self, expr : Expr.Set):
+        self.resolve(expr.value)
+        self.resolve(expr._object)
+
+Methods on Classes
+You can create instances of classes and stuff data into them, but the class itselfdoesn’t really
+do anything. Instances are just maps and all instances are more orless the same. To make them feel like instances
+of classes , we need behavior — methods.
+
+Our helpful parser already parses method declarations, so we’re good there. We also don’t need to add any new parser support for method
+calls . We already have
+.
+(getters) and
+()
+(function calls). A “method call” simply chains those together.
+
+For Lox both of these work
+a) var a = instance.method
+   a(some_arg);
+
+b) fun some_fn() {}
+   instance.field = some_fn;
+   instance.field()
+
+
+ Bound methods:
+Thus, like Python, C#, and others, we will have methods “bind” this to the original instance when the method is first grabbed.
+Python calls these bound methods.
+instance.method
+
+
+When we interpret a class declaration statement, we turn the syntactic representation of the class—its AST node—into its runtime representation.
+Now, we need to do that for the methods contained in the class as well. Each method declaration blossoms into a LoxFunction object.
+
+
+Where an instance stores state, the class stores behavior. LoxInstance has itsmap of fields, and LoxClass gets a map of methods.
+Even though methods are owned by the class, they are still accessed through instances of that class.
+
+When looking up a property on an instance, if we don’t find a matching field, we look for a method with that name on the instance’s class.
+If found, we return that.
+This is where the distinction between “field” and “property” becomes meaningful.
+When accessing a property, you might get a field—a bit of state stored on the instance—or you could hit a method defined on the instance’s class.
+
+
+"This"
+We can define both behavior and state on objects, but they aren’t tied together yet.
+Inside a method, we have no way to access the fields of the “current” object—the instance that the method was called on—nor
+can we call other methods on that same object
+
+instance.method
+We need to take "this" at the point that the method is accessed and attach it to the function somehow so that it stays around as long as we need it to.
+Hmm. a way to store some extra data that hangs around a function, eh? That sounds an awful lot like a closure, doesn’t it?
+
+If we defined this as a sort of hidden variable in an environment that surrounds the function returned when looking up a method,
+then uses of this in the body would be able to find it later.
+LoxFunction already has the ability to hold on to a surrounding environment, so we have the machinery we need
+
+Consider:
+
+class Cake {
+  taste() {
+    var adjective = "delicious";
+    print "The " + this.flavor + " cake is " + adjective + "!";
+  }
+}
+
+var cake = Cake();
+cake.flavor = "German chocolate";
+cake.taste(); // Prints "The German chocolate cake is delicious!"
+
+
+When we first evaluate the class definition, we create a LoxFunction for taste().
+Its closure is the environment surrounding the class, in this case the global one
+
+
+When we evaluate the cake.taste get expression, we create a new environment that binds this to the object the method is accessed from (here, cake).
+Then we make a new LoxFunction with the same code as the original one but using that new environment as its closure
+
+
+
+env-body_of_tast( adjective..etc) ====> env-this(contains this) ====> env_global(contains "cake", "Cake")
+
+
+Reusing our environment code for implementing this also takes care of interesting cases where methods and functions interact, like:
+class Thing {
+  getCallback() {
+    fun localFunction() {
+      print this;
+    }
+
+    return localFunction;
+  }
+}
+
+var callback = Thing().getCallback();
+callback();
+In, say, JavaScript, it’s common to return a callback from inside a method.
+That callback may want to hang on to and retain access to the original object—the this value—that the method was associated with.
+Our existing support for closures and environment chains should do all this correctly.
+
+In Resolver.py
+
+    def visit_class_stmt(self, stmt : Stmt.Class):
+    .....
+    .....
+           self.begin_scope()
+           self.scopes[-1]["this"] = True
+
+    ....resolve method bodies
+           self.end_scope()
+
+ Before we step in and start resolving the method bodies, we push a new scope and define “this” in it as if it were a variable.
+ Then, when we’re done, we discard that surrounding scope.
+
+ The resolver has a new scope for this, so the interpreter needs to create a corresponding environment for it.
+ Remember, we always have to keep the resolver’s scope chains and the interpreter’s linked environments in sync with each other. At runtime, we create the environment after we find the method on the instance. We replace the previous line of code that simply returned the method’s LoxFunction with this:
+
+lox/LoxInstance.java
+LoxFunction method = klass.findMethod(name.lexeme);
+if (method != null) return method.bind(this);
+	throw new RuntimeError(name,
+        "Undefined property '" + name.lexeme + "'.");
+
+
+lox/LoxFunction.java
+  LoxFunction bind(LoxInstance instance) {
+    Environment environment = new Environment(closure);
+    environment.define("this", instance);
+    return new LoxFunction(declaration, environment);
+  }
+
+There isn’t much to it. We create a new environment nestled inside the method’s original closure. Sort of a closure-within-a-closure.
+When the method is called, that will become the parent of the method body’s environment.
+
+We declare “this” as a variable in that environment and bind it to the given instance,
+the instance that the method is being accessed from.
+The returned LoxFunction now carries around its own little persistent world where “this” is bound to the object.
+
+The remaining task is interpreting those this expressions.
+Similar to the resolver, it is the same as interpreting a variable expression.
+
+lox/Interpreter.java
+  @Override
+  public Object visitThisExpr(Expr.This expr) {
+    return lookUpVariable(expr.keyword, expr);
+  }
+Go ahead and give it a try using that cake example from earlier.
+With less than twenty lines of code, our interpreter handles this inside methods even in all of the weird ways it can interact with nested classes, functions inside methods, handles to methods, etc.
+
+
+Section: "Invalid use of this"
+
+Nothing much
+
+Section: Constructors and Initializers
+
+LoxInstance instance = new LoxInstance(this);
+lox/LoxClass.java
+
+in call()
+
+
+    LoxFunction initializer = findMethod("init");
+    if (initializer != null) {
+      initializer.bind(instance).call(interpreter, arguments);
+    }
+
+    return instance;
+
+Section: Invoking init directly
+
+instance.init()
+  We return the "instance" after invoking init
+
+    def call(self, interpreter, arguments : List[Any]) -> Any:
+        env = Environment.Environment(self.closure) ### vishal function => new scope ==> new env created
+
+        for i, param in enumerate(self.declaration.params):
+            env.define(param.lexeme, arguments[i])
+        try:
+            interpreter.execute_block(self.declaration.body, env) ### vishal..==> block will run code in the passed "env"
+        except Interpreter.Return as e:
+            ### To take care of when user calls
+            ### instance.init()...we just return "this".."aft4r invoking init"
+            if self.is_initializer:
+                return self.closure.get_at(0, "this")
+            return e.value
+
+Returning from "init"
+We make it an error to return anything from  from "init"
+We do that in resolver.py
+
+
+    ##vishal, check during semaantic analysis
+    ## if function is initializer, we do not let it return a value
+    ## but we do allow emtpy return
+    ## like
+    ### return;
+    def visit_return_stmt(self, stmt : Stmt.Return):
+        if self.current_function == LoxFunction.FunctionType.NONE:
+            lox.error(stmt.keyword, "Cannot return from top-level code.")
+
+        if stmt.value != None:
+            if self.current_function == LoxFunction.FunctionType.INITIALIZER:
+                lox.error(stmt.keyword, "Cannot return a value from an initializer.")
+
+
+
+We do not alllow
+
+def init() { return blah; } ###we cannot return value from init ( taken care in resover.py)
+
+We do allow this
+def init() { return ; } ### Taken care in
+
+
+#vishaWe can’t simply see if the name of the LoxFunction is “init” because the user could have defined a function with that name. In that case, there is no this to return. To avoid that weird edge case, we’ll directly store whether the LoxFunction represents an initializer method. That means we need to go back and fix the few places where we create LoxFunctionsl..Hence we need initializer parameter
+## For actual function declarations, isInitializer is always false. For methods, we check the name.
+##
+class LoxFunction(LoxCallable.LoxCallable):
+    declaration : Stmt.Function ##vishal, Lox func has access to Stmt.Function AST node
+    closure : Environment.Environment
+    is_initializer : bool
+
+    def __init__(self, declaration : Stmt.Function, closure : Environment.Environment, is_initializer : bool):
+        self.declaration = declaration
+        self.closure = closure
+        self.is_initializer = is_initializer
+
+    def call(self, interpreter, arguments : List[Any]) -> Any:
+        env = Environment.Environment(self.closure) ### vishal function => new scope ==> new env created
+
+        for i, param in enumerate(self.declaration.params):
+            env.define(param.lexeme, arguments[i])
+        try:
+            interpreter.execute_block(self.declaration.body, env) ### vishal..==> block will run code in the passed "env"
+        except Interpreter.Return as e:
+            ###vishal...To allow user to do
+            ### return;
+            ### inside init...we allow return inside init as long as they do not return a value
+            ### That they do not return a value, syntactic check is done in resolver.py
+            if self.is_initializer:
+                return self.closure.get_at(0, "this")
+            return e.value
+
+        ### To take care of when user calls
+        ### instance.init()...we just return "this".."aft4r invoking init"
+        if self.is_initializer:
+            return self.closure.get_at(0, "this")
+=====================================================================================
+Inheritance:
+classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )?
+                 "{" function* "}" ;
+
+You might be surprised that we store the superclass name as an Expr.Variable,
+not a Token. The grammar restricts the superclass clause to a single identifier, but at runtime,
+that identifier is evaluated as a variable access. Wrapping the name in an Expr.Variable early on in the parser gives us an
+object that the resolver can hang the resolution information off of.
+
+class Class(Stmt):
+    name : Token
+    superclass : Variable
+    methods : List[Function]
+
+    def __init__(self, name : Token, superclass : Variable, methods : List[Function]):
+        self.name = name
+        self.superclass = superclass
+        self.methods = methods
+
+    def accept(self, visitor : StmtVisitor):
+        return visitor.visit_class_stmt(self)
+
+
+##### Superclass
+Ques Now, what does having a superclass actually do?
+Ans Inheriting methods
+Basically, it means that if you can call some method on an instance of the superclass,
+you should be able to call that method when given an instance of the subclass.
+In other words, methods are inherited from the superclass
+
+The change in LoxClass.py
+
+    def find_method(self, name : str):
+        if name in self.methods:
+            return self.methods.get(name)
+
+        if self.superclass != None:
+            return self.superclass.find_method(name) ##vishal..find method in superclass
+
+        return None
+
+
+Calling Superclass Methods
+class Doughnut {
+  cook() {
+    print "Fry until golden brown.";
+  }
+}
+
+class BostonCream < Doughnut {
+  cook() {
+    super.cook();
+    print "Pipe full of custard and coat with chocolate.";
+  }
+}
+
+Super is an expression with
+
+primary        → "true" | "false" | "nil" | "this"
+               | NUMBER | STRING | IDENTIFIER | "(" expression ")"
+               | "super" "." IDENTIFIER ;
+
+class Super(Expr):
+    keyword : Token
+    method : Token
+
+    def __init__(self, keyword : Token, method : Token):
+        self.keyword = keyword
+        self.method = method
+
+    def accept(self, visitor : ExprVisitor):
+        return visitor.visit_super_expr(self)
+
+Semantics
+Earlier, I said a super expression starts the method lookup from “the superclass”, but which superclass?
+The naïve answer is the superclass of this, the object the surrounding method was called on. That coincidentally
+produces the right behavior in a lot of cases, but that’s not actually correct.
+
+Instead, lookup should start on the superclass of the class containing the super expression.
+
+Example to understand the difference:
+
+class A {
+  method() {
+    print "A method";
+  }
+}
+
+class B < A {
+  method() {
+    print "B method";
+  }
+
+  test() {
+    super.method();
+  }
+}
+
+class C < B {}
+
+C().test();
+
+Thus, in order to evaluate a super expression, we need access to the superclass of the class definition surrounding the call.
+Alack and alas, at the point in the interpreter where we are executing a super expression, we don’t have that easily available.
+
+We could add a field to LoxFunction to store a reference to the LoxClass that owns that method.
+The interpreter would keep a reference to the currently executing LoxFunction so that we could look it up later when we hit a super expression. From there, we’d get the LoxClass of the method, then its superclass.
+
+That’s a lot of plumbing. In the last chapter, we had a similar problem when we needed to add support for this.
+In that case, we used our existing environment and closure mechanism to store a reference to the current object.
+Could we do something similar for storing the superclass? Well, I probably wouldn’t be talking about it if the answer was no, so . . . yes.
+
+Does anyone even like rhetorical questions?
+
+One important difference is that we bound this when the method was accessed.
+The same method can be called on different instances and each needs its own this.
+ With super expressions, the superclass is a fixed property of the class declaration itself.
+Every time you evaluate some super expression, the superclass is always the same.
+
+That means we can create the environment for the superclass once, when the class definition is executed.
+ Immediately before we define the methods, we make a new environment to bind the class’s superclass to the name super.
+
+In resolver.py
+
+    def visit_class_stmt(self, stmt : Stmt.Class):
+        enclosing_class = self.current_class
+        self.current_class = ClassType.CLASS ##vishal..tells we are in/or not in a class
+                                             ## invalid use of "this"
+                                             ## we do not want "this" being used outside method
+
+        self.declare(stmt.name)
+        self.define(stmt.name)
+
+        ## To avoid , class Oops < Oops {}
+        if stmt.superclass != None and stmt.name.lexeme == stmt.superclass.name.lexeme:
+            lox.error(stmt.superclass.name, "A class cannot inherit from itself.")
+
+        if stmt.superclass != None:
+            self.current_class = ClassType.SUBCLASS
+            self.resolve(stmt.superclass) ##remember superclass is Expr.Variable
+
+       ## Adding support for super....
+       ## function_body_env===>optional_env_containing_super===>env_containg_this====>global_env
+
+        if stmt.superclass != None:
+            self.begin_scope()
+            self.scopes[-1]["super"] = True
+
+        ### vishal
+        ### i.e creating scope in "class"
+        ### adding "this" in scope...for "bound methods"
+        #Now, whenever a this expression is encountered (at least inside a method) it will resolve to
+        #a local variable defined in an implicit scope just outside of the block for the method body
+
+        self.begin_scope()
+        self.scopes[-1]["this"] = True
+        ## we do not want "this" being used outside method
+
+        for method in stmt.methods:
+            declaration = LoxFunction.FunctionType.METHOD
+
+            if method.name.lexeme == "init":
+                declaration = LoxFunction.FunctionType.INITIALIZER
+
+            self.resolve_function(method, declaration)
+
+        self.end_scope()
+
+        if stmt.superclass != None:
+            self.end_scope()
+
+        self.current_class = enclosing_class
+
+
+Vishal..now that we have put "super" in scope...
+we can resolve it when we hit super
+
+We resolve the super token exactly as if it were a variable. The resolution stores the number of hops
+along the environment chain that the interpreter needs to walk to find the environment where the superclass is stored.
+    def visit_super_expr(self, expr : Expr.Super):
+
+        if self.current_class == ClassType.NONE:
+            lox.error(expr.keyword, "Cannot use 'super' outside of a class.")
+        elif self.current_class != ClassType.SUBCLASS:
+            lox.error(expr.keyword, "Cannot use 'super' in a class with no superclass.")
+
+        self.resolve_local(expr, expr.keyword)
+
+
+Changes to interpreter.py
+This code is mirrored in the interpreter. When we evaluate a subclass definition, we create a new environment.
+Inside that environment, we store a reference to the superclass—the actual LoxClass object for the superclass
+which we have now that we are in the runtime.
+Then we create the LoxFunctions for each method.
+Those will capture the current environment—the one where we just bound “super”—as their closure,
+holding on to the superclass like we need. Once that’s done, we pop the environment.
+
+    def visit_class_stmt(self, stmt : Stmt.Class):
+        superclass = None
+        if stmt.superclass != None:
+            superclass = self.evaluate(stmt.superclass)
+            if not isinstance(superclass, LoxClass.LoxClass):
+                raise RuntimeError(stmt.superclass.name, "Superclass must be a class.")
+
+        self.env.define(stmt.name.lexeme, None)
+
+        if stmt.superclass != None:
+            self.env = Environment.Environment(self.env)
+            self.env.define("super", superclass)
+
+        methods = {}
+
+        for method in stmt.methods:
+            function = LoxFunction.LoxFunction(method, self.env, method.name.lexeme == "init")
+            methods[method.name.lexeme] = function
+
+        klass = LoxClass.LoxClass(stmt.name.lexeme, superclass, methods)
+
+        if superclass != None:
+            self.env = self.env.enclosing
+
+        self.env.assign(stmt.name, klass)
+
+
+In interpreter.py
+
+
+    def visit_super_expr(self, expr : Expr.Super):
+        distance = self._locals.get(expr)
+
+        superclass = self.env.get_at(distance, "super")
+        _object = self.env.get_at(distance - 1, "this")
+
+        method = superclass.find_method(expr.method.lexeme)
+
+        if method == None:
+            raise RuntimeError(expr.method, f"Undefined property '{expr.method.lexeme}'.")
+
+        ## Even though we are looking up the method on the superclass, the instance is still this.
+        return method.bind(_object)
+
+
+Invalid "uses" of super
+1)
+class Eclair {
+  cook() {
+    super.cook(); ### using super but there is no superclass
+    print "Pipe full of crème pâtissière.";
+  }
+}
+
+2)
+super.notEvenInAClass(); ##vishal not even in class
+
+Even though Lox is dynamically typed, that doesn’t mean we want to defer everything to runtime.
+If the user made a mistake, we’d like to help them find it sooner rather than later.
+So we’ll report these errors statically, in the resolver.
+
+Changes in resovlver.py
+1)
+class ClassType(Enum):
+    NONE     = auto()
+    CLASS    = auto()
+    SUBCLASS = auto() ##changes
+
+ 2)
+ In visit_class_statement
+
+        if stmt.superclass != None:
+            self.current_class = ClassType.SUBCLASS
+            self.resolve(stmt.superclass) ##remember superclass is Expr.Variable
+ 3)
+ In visit_super_expr
+    def visit_super_expr(self, expr : Expr.Super):
+
+        if self.current_class == ClassType.NONE:
+            lox.error(expr.keyword, "Cannot use 'super' outside of a class.")
+        elif self.current_class != ClassType.SUBCLASS:
+            lox.error(expr.keyword, "Cannot use 'super' in a class with no superclass.")
+
+        self.resolve_local(expr, expr.keyword)
+
+
+
+
+
+
+====================================================================================

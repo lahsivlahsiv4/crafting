@@ -8,6 +8,8 @@ import stmt
 import environment
 import LoxCallable
 import LoxFunction
+import LoxClass
+import LoxInstance
 class RuntimeError(Exception):
     def __init__(self, token, message):
         super().__init__(message)
@@ -73,6 +75,40 @@ class Interpreter(expr.ExprVisitor, stmt.StmtVisitor):
             self.execute(statement.then_branch)
         elif statement.else_branch != None:
             self.execute(statement.else_branch)
+
+    def visit_class_stmt(self, statement : stmt.Class):
+        self.env.define(statement.name.lexeme, None)
+
+        methods = {}
+
+        for method in statement.methods:
+            function = LoxFunction.LoxFunction(method, self.env, method.name.lexeme == "init")
+            methods[method.name.lexeme] = function
+
+        klass = LoxClass.LoxClass(statement.name.lexeme, methods)
+        
+        self.env.assign(statement.name, klass)
+    
+    def visit_get_expr(self, expr):
+        objekt = self.evaluate(expr._object)
+
+        if isinstance(objekt, LoxInstance.LoxInstance):
+            return objekt.get(expr.name)
+        
+        raise RuntimeError(expr.name, "Only instances have properties.")
+
+    def visit_this_expr(self, expr):
+        return self.look_up_variable(expr.keyword, expr)
+
+    def visit_set_expr(self, expr):
+        objekt = self.evaluate(expr._object)
+
+        if not isinstance(objekt, LoxInstance.LoxInstance):
+            raise RuntimeError(expr.name, "Only instances have fields.")
+
+        value = self.evaluate(expr.value)
+        objekt._set(expr.name, value)
+        return value
 
     def visit_expression_stmt(self, stmt):
         self.evaluate(stmt.expression)
@@ -169,7 +205,7 @@ class Interpreter(expr.ExprVisitor, stmt.StmtVisitor):
             return self.is_equal(left, right)
     
     def visit_function_stmt(self, stmt):
-        function = LoxFunction.LoxFunction(stmt, self.env)
+        function = LoxFunction.LoxFunction(stmt, self.env, False)
         self.env.define(stmt.name.lexeme, function)
     
     def visit_return_stmt(self, stmt):

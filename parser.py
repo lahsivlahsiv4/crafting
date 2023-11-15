@@ -25,7 +25,9 @@ class Parser:
 
     def declaration(self) -> stmt.Stmt:
         try:
-            if self.match(Token.TokenType.FUN):
+            if self.match(Token.TokenType.CLASS):
+                return self.class_declaration()
+            elif self.match(Token.TokenType.FUN):
                 return self.function("function")
             elif self.match(Token.TokenType.VAR):
                 return self.var_declaration()
@@ -34,6 +36,20 @@ class Parser:
         except ParseError:
             self.synchronize()
             return None
+        
+    
+    def class_declaration(self) -> stmt.Stmt:
+        name = self.consume(Token.TokenType.IDENTIFIER, "Expect class name.")
+        self.consume(Token.TokenType.LEFT_BRACE, "Expect '{' before class body.")
+        
+        methods = []
+
+        while not self.check(Token.TokenType.RIGHT_BRACE) and not self.is_at_end():
+            methods.append(self.function("method"))
+        
+        self.consume(Token.TokenType.RIGHT_BRACE, "Expect '}' after class body.")
+
+        return stmt.Class(name, methods)
     
     def function(self, kind : str) -> stmt.Function:
         name = self.consume(Token.TokenType.IDENTIFIER, f"Expect {kind} name.")
@@ -190,6 +206,9 @@ class Parser:
             if type(expression) == expr.Variable:
                 name = expression.name
                 return expr.Assign(name, value)
+            elif type(expression) == expr.Get:
+                get = expression
+                return expr.Set(get._object, get.name, value)
             else:
                 self.error(equals, "Invalid assignment target")
         
@@ -300,6 +319,9 @@ class Parser:
         while True:
             if self.match(Token.TokenType.LEFT_PAREN):
                 expression = self.finish_call(expression)
+            elif self.match(Token.TokenType.DOT):
+                name = self.consume(Token.TokenType.IDENTIFIER, "Expect property name after '.'.")
+                expression = expr.Get(expression, name)
             else:
                 break
         
@@ -333,6 +355,9 @@ class Parser:
         if self.match(Token.TokenType.NUMBER, Token.TokenType.STRING):
             return expr.Literal(self.previous().literal)
         
+        if self.match(Token.TokenType.THIS):
+            return expr.This(self.previous())
+
         if (self.match(Token.TokenType.IDENTIFIER)):
             return expr.Variable(self.previous())
         

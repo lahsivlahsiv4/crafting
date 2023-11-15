@@ -10,11 +10,17 @@ class ExprVisitor:
         raise NotImplementedError()
     def visit_call_expr(self, expr):
         raise NotImplementedError()
+    def visit_get_expr(self, expr):
+        raise NotImplementedError()
     def visit_grouping_expr(self, expr):
         raise NotImplementedError()
     def visit_literal_expr(self, expr):
         raise NotImplementedError()
     def visit_logical_expr(self, expr):
+        raise NotImplementedError()
+    def visit_set_expr(self, expr):
+        raise NotImplementedError()
+    def visit_this_expr(self, expr):
         raise NotImplementedError()
     def visit_unary_expr(self, expr):
         raise NotImplementedError()
@@ -66,6 +72,18 @@ class Call(Expr):
         return visitor.visit_call_expr(self)
 
 
+class Get(Expr):
+    _object : Expr
+    name : Token
+
+    def __init__(self, _object : Expr, name : Token):
+        self._object = _object
+        self.name = name
+
+    def accept(self, visitor : ExprVisitor):
+        return visitor.visit_get_expr(self)
+
+
 class Grouping(Expr):
     expression : Expr
 
@@ -98,6 +116,30 @@ class Logical(Expr):
 
     def accept(self, visitor : ExprVisitor):
         return visitor.visit_logical_expr(self)
+
+
+class Set(Expr):
+    _object : Expr
+    name : Token
+    value : Expr
+
+    def __init__(self, _object : Expr, name : Token, value : Expr):
+        self._object = _object
+        self.name = name
+        self.value = value
+
+    def accept(self, visitor : ExprVisitor):
+        return visitor.visit_set_expr(self)
+
+
+class This(Expr):
+    keyword : Token
+
+    def __init__(self, keyword : Token):
+        self.keyword = keyword
+
+    def accept(self, visitor : ExprVisitor):
+        return visitor.visit_this_expr(self)
 
 
 class Unary(Expr):
