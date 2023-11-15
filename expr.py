@@ -20,6 +20,8 @@ class ExprVisitor:
         raise NotImplementedError()
     def visit_set_expr(self, expr):
         raise NotImplementedError()
+    def visit_super_expr(self, expr):
+        raise NotImplementedError()
     def visit_this_expr(self, expr):
         raise NotImplementedError()
     def visit_unary_expr(self, expr):
@@ -130,6 +132,18 @@ class Set(Expr):
 
     def accept(self, visitor : ExprVisitor):
         return visitor.visit_set_expr(self)
+
+
+class Super(Expr):
+    keyword : Token
+    method : Token
+
+    def __init__(self, keyword : Token, method : Token):
+        self.keyword = keyword
+        self.method = method
+
+    def accept(self, visitor : ExprVisitor):
+        return visitor.visit_super_expr(self)
 
 
 class This(Expr):

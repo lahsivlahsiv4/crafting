@@ -6,5 +6,8 @@ test (x) {
 
 }
 
-var a = A();
-a.test(2);
+class B < A {
+
+}
+var b = B();
+b.test(2);

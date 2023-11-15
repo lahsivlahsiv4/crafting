@@ -12,8 +12,9 @@ import LoxFunction
 import interpreter as Interpreter
 
 class ClassType(Enum):
-    NONE  = auto()
-    CLASS = auto()
+    NONE     = auto()
+    CLASS    = auto()
+    SUBCLASS = auto()
 
 class Resolver(expr.ExprVisitor, stmt.StmtVisitor):
     scopes : Deque[Dict[str, bool]]
@@ -136,6 +137,18 @@ class Resolver(expr.ExprVisitor, stmt.StmtVisitor):
         self.declare(stmt.name)
         self.define(stmt.name)
 
+        if stmt.superclass != None and stmt.name.lexeme == stmt.superclass.name.lexeme:
+            lox.error(stmt.superclass.name, "A class cannot inherit from itself.")
+
+        if stmt.superclass != None:
+            self.current_class = ClassType.SUBCLASS
+            self.resolve(stmt.superclass)
+
+        
+        if stmt.superclass != None:
+            self.begin_scope()
+            self.scopes[-1]["super"] = True
+
         self.begin_scope()
         self.scopes[-1]["this"] = True
 
@@ -149,6 +162,9 @@ class Resolver(expr.ExprVisitor, stmt.StmtVisitor):
         
         self.end_scope()
 
+        if stmt.superclass != None:
+            self.end_scope()
+
         self.current_class = enclosing_class
 
     def visit_this_expr(self, expr):
@@ -160,6 +176,16 @@ class Resolver(expr.ExprVisitor, stmt.StmtVisitor):
     def visit_set_expr(self, expr):
         self.resolve(expr.value)
         self.resolve(expr._object)
+
+    
+    def visit_super_expr(self, expr):
+
+        if self.current_class == ClassType.NONE:
+            lox.error(expr.keyword, "Cannot use 'super' outside of a class.")
+        elif self.current_class == ClassType.SUBCLASS:
+            lox.error(expr.keyword, "Cannot use 'super' in a class with no superclass.")
+        
+        self.resolve_local(expr, expr.keyword)
     
     def visit_call_expr(self, expr):
         self.resolve(expr.callee)
